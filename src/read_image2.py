@@ -2,9 +2,9 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from utils import plotImage, show_pipeline, orderPoints, sort_contours
-from classifier import predict # Assumo che la tua funzione si chiami così o "predict"
+from classifier import predict
 
-image_path = "assets/dirty_maze.png"
+image_path = "assets/test2.jpg"
 
 def getBinaryImage(image):
     """

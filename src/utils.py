@@ -2,50 +2,58 @@
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
+import math
 
 def plotImage(image, title, saveToFile = False):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # per evitare colori sballati
-    #plt.imshow(image)
-    #plt.title(title)
-    #plt.axis('off')
+    plt.imshow(image)
+    plt.title(title)
+    plt.axis('off')
     if saveToFile:
         plt.savefig('plots/{title}.png')
-   # plt.show()
+    plt.show()
 
-def show_pipeline(steps):
+def show_pipeline(images_with_titles, cols=10):
     """
-    Mostra più immagini fianco a fianco in un'unica finestra.
-    
-    Parametri:
-    steps -- Una lista di tuple: [(immagine, "Titolo"), (immagine2, "Titolo2"), ...]
+    Mostra una lista di tuple (immagine, titolo) in una griglia dinamica.
+    cols: numero di immagini per riga (10 è perfetto per il tuo labirinto)
     """
-    num_images = len(steps)
-    
-    # Crea una "figura" con '1' riga e 'num_images' colonne
-    # figsize=(width, height) imposta la dimensione della finestra in pollici
-    fig, axes = plt.subplots(1, num_images, figsize=(5 * num_images, 5))
-    
-    # Se c'è una sola immagine, 'axes' non è una lista, quindi lo rendiamo tale per uniformità
-    if num_images == 1:
+    n = len(images_with_titles)
+    if n == 0:
+        return
+
+    # Calcola il numero di righe necessarie (arrotondamento per eccesso)
+    rows = math.ceil(n / cols)
+
+    # Crea la figura dinamicamente. Moltiplichiamo per 2 o 3 pollici a cella
+    # per avere una finestra sufficientemente grande.
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 2, rows * 2))
+
+    # Matplotlib restituisce 'axes' in formati diversi a seconda delle dimensioni.
+    # .flatten() lo trasforma in un array 1D comodo da iterare.
+    if n == 1:
         axes = [axes]
-        
-    for i, (image, title) in enumerate(steps):
-        ax = axes[i]
-        
-        # Gestione Colore vs Bianco e Nero
-        if len(image.shape) == 2:
-            # Immagine in scala di grigi (2 dimensioni: H, W)
-            ax.imshow(image, cmap='gray')
-        else:
-            # Immagine a colori (3 dimensioni: H, W, Canali)
-            # Converti da BGR (OpenCV) a RGB (Matplotlib)
-            rgb_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            ax.imshow(rgb_img)
+    elif rows > 1 or cols > 1:
+        axes = axes.flatten()
+
+    for i, ax in enumerate(axes):
+        if i < n:
+            img, title = images_with_titles[i]
             
-        ax.set_title(title)
-        ax.axis('off') # Rimuove i righelli
+            # Matplotlib vuole RGB, OpenCV usa BGR. Se l'immagine è a colori, convertiamo.
+            # Se è scala di grigi (2 dimensioni), usiamo cmap='gray'
+            if len(img.shape) == 2:
+                ax.imshow(img, cmap='gray')
+            else:
+                ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            
+            ax.set_title(title, fontsize=8)
         
-    plt.tight_layout() # Ottimizza gli spazi bianchi tra le immagini
+        # Nascondiamo le coordinate (numeri sugli assi) per non fare confusione
+        ax.axis('off') 
+
+    # Compatta il layout per evitare che i titoli si sovrappongano alle foto
+    plt.tight_layout()
     plt.show()
 
 

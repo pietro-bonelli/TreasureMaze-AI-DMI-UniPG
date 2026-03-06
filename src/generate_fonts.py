@@ -40,7 +40,7 @@ def generate_digital_dataset(num_samples=2000):
 
     for _ in range(num_samples):
         # 1. Scelta casuale carattere e font
-        char_to_draw = random.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") # Solo maiuscole e numeri
+        char_to_draw = random.choice("1234STX") # Solo caratteri necessari
         font_name = random.choice(font_paths)
         
         try:

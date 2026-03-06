@@ -4,28 +4,34 @@ from matplotlib import pyplot as plt
 from utils import plotImage, show_pipeline, orderPoints, sort_contours
 from classifier import predict
 
-image_path = "assets/dirty_maze.png"
+image_path = "assets/test_maze.png"
+image_path = "assets/test_serio1.png"
 
 
 def getBinaryImage(image):
     plotImage(image, "Immagine originale")
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # converto l'immagine in SCALA DI GRIGI, essenziale per analisi successive
     plotImage(gray_image, "Scala di grigi")
-    
+
     ret, thresh1 = cv2.threshold(gray_image, 127, 255, cv2.THRESH_BINARY_INV) # applico un threshold statico del "50%"
     plotImage(thresh1, "Immagine con Threshold classico")
     
     # Per applicare adaptive Threshold, occorre fare "blurring", ossia rimuovere il rumore dall'immagine.
-    blur = cv2.GaussianBlur(gray_image, (19,19), 0)
+    #blur = cv2.GaussianBlur(gray_image, (5, 5), 0)
+    blur = cv2.medianBlur(gray_image, 5)
+    plotImage(blur, "Immagine blurrata")
 
     thresh2a = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, blockSize=7, C=2) # applico un threshold adattivo con tecnica "MEAN". blockSize = quanti pixel guardare intorno per deciere se un pixel è bianco o nero.
     plotImage(thresh2a, "Immagine con Threshold adattivo MEAN")
-    thresh2b = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, blockSize=7, C=2) # applico un threshold adattivo con tecnica "GAUS"
+    thresh2b = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, blockSize=15, C=3) # applico un threshold adattivo con tecnica "GAUS"
     plotImage(thresh2b, "Immagine con Threshold adattivo GAUSSIAN")
 
     # Cerco di "chiudere" i buchi nei perimetri dei box
-    kernel = np.ones((5,5), np.uint8)
-    thresh2b_morph = cv2.morphologyEx(thresh2b, cv2.MORPH_CLOSE, kernel)
+    kernel_small = np.ones((3,3), np.uint8)
+    kernel_large = np.ones((5,5), np.uint8)
+    thresh2b_morph = cv2.dilate(thresh2b, kernel_small, iterations=1)
+    thresh2b_morph = cv2.morphologyEx(thresh2b_morph, cv2.MORPH_CLOSE, kernel_large)
+    plotImage(thresh2b_morph, "Immagine con Threshold + Morph")
 
     # Disegno un super rettangolo sul perimetro esterno dell'immagine, così da non perdere il perimetro se l'immagine dovesse essere tagliata
     h, w = thresh2b_morph.shape[:2] # w,h sono le coordinate dell'angolo in basso a destra dell'immagine
@@ -89,6 +95,7 @@ def findBoxes(binaryImage, originalImage, grayImage):
     
     # Visualizzazione
     debug_steps = [(contoursImg, "Celle individuate")]
+    plotImage(contoursImg, "Contorni")
     for i in range(len(croppedImages)):
         debug_steps.append((croppedImages[i], f"Cella {i}"))
         
@@ -101,7 +108,10 @@ binaryImage, grayImage = getBinaryImage(image)
 boxes = findBoxes(binaryImage, image, grayImage)
 
 labirinto = []
+debug_steps = []
 for box in boxes:
     prediction = predict(box)
     labirinto.append(prediction)
     print(prediction)
+    debug_steps.append((box, f"Previsione: {prediction}"))
+show_pipeline(debug_steps)

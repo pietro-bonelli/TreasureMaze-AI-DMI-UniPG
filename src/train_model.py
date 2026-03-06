@@ -6,7 +6,8 @@ import os
 from matplotlib import pyplot as plt
 import tensorflow as tf
 import keras
-from keras import layers, models
+from keras import layers
+from keras.callbacks import EarlyStopping
 
 from generate_fonts import generate_digital_dataset
 
@@ -62,10 +63,29 @@ for i in range(0, size):
 x_train = np.array(images)
 
 # Aggiungo immagini di caratteri dei font create artificialmente
-x_train_digital, y_train_digital = generate_digital_dataset(100000)
+x_train_digital, y_train_digital = generate_digital_dataset(7)
 
 x_train = np.concatenate((x_train, x_train_digital), axis=0)
 y_train = np.concatenate((y_train, y_train_digital), axis=0)
+
+# Mantengo solo i caratteri che mi interessano (1-4, S, T, X)
+labels_to_keep = [1, 2, 3, 4, 28, 29, 33]
+# Filtro gli array
+mask = np.isin(y_train, labels_to_keep)
+x_train = x_train[mask]
+y_train = y_train[mask]
+print(f"Dataset ridotto a {len(y_train)} immagini.")
+# Rimappo le etichette da 0 a 7 (altrimenti la rete neurale si aspetta 33 oggetti al posto di 7)
+label_map = {
+    1: 0, # 1
+    2: 1, # 2
+    3: 2, # 3
+    4: 3, # 4
+    28: 4, # S
+    29: 5, # T
+    33: 6 # X
+}
+y_train = np.array([label_map[y] for y in y_train]) # applica la nuova mappa a y_train.
 
 # Permuto le immagini
 perm = np.random.permutation(len(x_train))
@@ -82,13 +102,22 @@ model = keras.models.Sequential([
     keras.Input(shape=(28, 28)), # definisce la forma dell'input
     layers.Flatten(), # trasforma immagine da matrice 28x28 in un array di 784 elementi, necessario per i layers successivi.
     layers.Dense(128, activation='relu'), # prende in input i 784 numeri del layer precedente e crea 128 neuroni artificiali. 'relu' trasforma neuroni negativi in 0. Ritorna una lista di 128 numeri
-    layers.Dense(47, activation='softmax') # prende in input i 128 numeri dell'hidden layer precedente, li collega a 47 neuroni finali (uno per ogni carattere EMNIST). 'softmax' trasforma i numeri in percentuali. Ritorna un vettore di possibilità
+    layers.Dense(7, activation='softmax') # prende in input i 128 numeri dell'hidden layer precedente, li collega a 7 neuroni finali (uno per ogni carattere EMNIST). 'softmax' trasforma i numeri in percentuali. Ritorna un vettore di possibilità
 ])
 
 model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['sparse_categorical_accuracy'])
-# categorical_crossentropy calcola la distanza matematica tra la distribuzione di probabilità predetta e quella reale. Utile quando ho più di 2 classi (in questo caso 47)
+# categorical_crossentropy calcola la distanza matematica tra la distribuzione di probabilità predetta e quella reale. Utile quando ho più di 2 classi (in questo caso 7)
+
+# Implemento Early Stopping per fermare addestramento al momento ottimale ed evitare overfitting.
+# Posso implementarla poiché ho inserito un validation test con il quale fare il confronto (rispetto al solo training)
+early_stopping = EarlyStopping(
+    monitor='val_loss',
+    patience = 2, # Se var_loss non scende per 2 epoche di fila, innesca l'Early Stopping.
+    restore_best_weights=True, # riporta la rete ai pesi dell'epoca migliore.
+    mode='min' # per minimizzare la var_loss 
+)
 
 print("Inizio fase di addestramento...")
-model.fit(x_train, y_train, epochs=10, verbose=2, validation_split=0.2)
+model.fit(x_train, y_train, epochs=10, verbose=2, validation_split=0.2, callbacks=[early_stopping])
 print("Fine fase di addestramento.")
 model.save('assets/model.keras')

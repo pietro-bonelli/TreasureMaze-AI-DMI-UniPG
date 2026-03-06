@@ -1,0 +1,12 @@
+v1: l'agente può compiere un solo passo alla volta
+v2: l'agente si può muovere solo fra stanze adiacenti
+v3: la posizione iniziale dell'agente è rappresentata dalla cella avente la lettera 'S' (start).
+v4: le celle descritte da un numero compreso tra 1 e 4 (inclusi) sono calpestabili al medesimo costo.
+v5: le celle aventi la lettera 'X' rappresentano un muro, che può essere abbattuto a costo 5.
+v6: i tesori sono rappresentati dalla lettera 'T'
+v7: il labirinto è rappresentato da una matrice di dimensioni N x N. Ogni cella della matrice rappresenta una possibile posizione dell'agente.
+v8: le possibili azioni dell'agente sono: ['spostamento verso l'alto', 'spostamento verso il basso', 'spostamento verso destra', 'spostamento verso sinistra']
+v9: sono possibili 2 versioni del gioco. Nella prima, lo scopo è quello di catturare tutti i tesori. Nella seconda, lo scopo è catturare k tesori (k definito dall'utente)
+v10: la matrice è estrapolata da un'immagine del labirinto stesso.
+v11: lo stato è rappresentato da una tupla composta da  tuple(tuple(POSIZIONE ATTUALE), tuple(TESORI TROVATI), tuple(MURI ABBATTUTI))
+v12: il costo per calpestare un Tesoro o lo Stato Iniziale (in un secondo momento) è 1.
