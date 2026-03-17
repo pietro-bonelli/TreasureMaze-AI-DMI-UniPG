@@ -9,7 +9,7 @@ import keras
 from keras import layers
 from keras.callbacks import EarlyStopping
 
-from generate_fonts import generate_digital_dataset
+#from TreasureMaze.old.generate_fonts import generate_digital_dataset
 
 def read_emnist_from_zip(path_to_zip):
     """
@@ -54,20 +54,6 @@ def read_emnist_from_zip(path_to_zip):
 
 
 x_train, y_train = read_emnist_from_zip('assets/emnist.zip')
-size = x_train.shape[0]
-images = []
-
-# Pre-Processig, ruoto le immagini di 90 gradi e le specchio per renderle "dritte"
-for i in range(0, size):
-    images.append(np.fliplr(np.rot90(x_train[i], -1)))
-x_train = np.array(images)
-
-# Aggiungo immagini di caratteri dei font create artificialmente
-x_train_digital, y_train_digital = generate_digital_dataset(7)
-
-x_train = np.concatenate((x_train, x_train_digital), axis=0)
-y_train = np.concatenate((y_train, y_train_digital), axis=0)
-
 # Mantengo solo i caratteri che mi interessano (1-4, S, T, X)
 labels_to_keep = [1, 2, 3, 4, 28, 29, 33]
 # Filtro gli array
@@ -87,6 +73,21 @@ label_map = {
 }
 y_train = np.array([label_map[y] for y in y_train]) # applica la nuova mappa a y_train.
 
+
+size = x_train.shape[0]
+images = []
+
+# Pre-Processig, ruoto le immagini di 90 gradi e le specchio per renderle "dritte"
+for i in range(0, size):
+    images.append(np.fliplr(np.rot90(x_train[i], -1)))
+x_train = np.array(images)
+
+# Aggiungo immagini di caratteri dei font create artificialmente
+#x_train_digital, y_train_digital = generate_digital_dataset(100)
+
+#x_train = np.concatenate((x_train, x_train_digital), axis=0)
+#y_train = np.concatenate((y_train, y_train_digital), axis=0)
+
 # Permuto le immagini
 perm = np.random.permutation(len(x_train))
 x_train = x_train[perm]
@@ -99,11 +100,23 @@ x_train = x_train.astype('float32') / 255.0 # per trasformare i dati dal range 0
 
 # Creo il modello
 model = keras.models.Sequential([
-    keras.Input(shape=(28, 28)), # definisce la forma dell'input
-    layers.Flatten(), # trasforma immagine da matrice 28x28 in un array di 784 elementi, necessario per i layers successivi.
-    layers.Dense(128, activation='relu'), # prende in input i 784 numeri del layer precedente e crea 128 neuroni artificiali. 'relu' trasforma neuroni negativi in 0. Ritorna una lista di 128 numeri
-    layers.Dense(7, activation='softmax') # prende in input i 128 numeri dell'hidden layer precedente, li collega a 7 neuroni finali (uno per ogni carattere EMNIST). 'softmax' trasforma i numeri in percentuali. Ritorna un vettore di possibilità
+    keras.Input(shape=(28, 28, 1)),
+    # Data Augmentation: applico piccole trasformazioni alle immagini (rotazioni/zoom) per addestrare meglio la rete a riconoscere i caratteri correttamente.
+    layers.RandomRotation(factor=0.03, fill_mode='constant', fill_value=0.0), # max 15% rotazione
+    layers.RandomZoom(height_factor=0.05, width_factor=0.1, fill_mode='constant', fill_value=0.0), # zoom in/out max 10%
+    # Parte 1 CNN - Riconosce tratti base (come linee verticali/orizzontali)
+    layers.Conv2D(32, kernel_size=(3, 3), activation='relu'),
+    layers.MaxPooling2D(pool_size=(2, 2)), # Rimpicciolisce l'immagine senza perdere caratteristiche importanti.
+    # Parte 2 CNN - Combino i tratti per capire forme complesse (unisce i tratti base)
+    layers.Conv2D(64, kernel_size=(3, 3), activation='relu'), # kernel_size = quanti pixel guardare alla volta
+    layers.MaxPooling2D(pool_size=(2, 2)),
+    # Rete densa per la decisione finale
+    layers.Flatten(), # crea un array monodimensionale
+    layers.Dropout(0.5), # spegne a caso il 50% dei neuroni (per evitare overfitting)
+    layers.Dense(128, activation='relu'),
+    layers.Dense(7, activation='softmax') # le 7 classi finali (1, 2, 3, 4, S, T, X)
 ])
+# Relu trasforma i risultati negativi in 0 (funzione di attivazione)
 
 model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['sparse_categorical_accuracy'])
 # categorical_crossentropy calcola la distanza matematica tra la distribuzione di probabilità predetta e quella reale. Utile quando ho più di 2 classi (in questo caso 7)
@@ -118,6 +131,6 @@ early_stopping = EarlyStopping(
 )
 
 print("Inizio fase di addestramento...")
-model.fit(x_train, y_train, epochs=10, verbose=2, validation_split=0.2, callbacks=[early_stopping])
+model.fit(x_train, y_train, epochs=15, verbose=2, validation_split=0.2, callbacks=[early_stopping])
 print("Fine fase di addestramento.")
 model.save('assets/model.keras')

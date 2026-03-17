@@ -1,4 +1,8 @@
-from aima.search import Problem
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from aima.search import Problem, astar_search
 import math
 from typing import NamedTuple, Tuple
 
@@ -103,3 +107,100 @@ class TreasureMaze(Problem):
             return c + 1
         else: # cella calpestabile con costo 1/4
             return c + int(cell)
+        
+    def h(self, node) -> float: 
+        """Distanza dal m-esimo tesoro più vicino"""
+        state = node.state
+        collected = state.treasures
+        m_missing = self.k - len(collected) # m = tesori ancora da raccogliere
+        
+        if m_missing <= 0:
+            return 0.0
+        
+        missing_treasures = self.treasures - set(collected)
+        distances = []
+        i, j = state.pos
+        for ii, jj in missing_treasures:
+            dist = abs(i - ii) + abs(j - jj)
+            distances.append(dist)
+        distances.sort() # Costo O(nlogn)
+        return float(distances[m_missing - 1]) # m-esimo tesoro più vicino
+
+    def h_alternative(self, node) -> float:
+        """Distanza di Manhattan dal tesoro (non raccolto) più vicino."""
+        state = node.state
+        pos = state.pos
+        collected = state.treasures
+        missing_k = self.k - len(collected)
+        if missing_k <= 0: # se ho già trovato tutti i tesori necessari, l'euristica deve valere 0.
+            return 0.0
+        
+        missing_treasures = self.treasures - set(collected) # coordinate dei tesori ancora da raccogliere.
+        min_dist = float('inf')
+
+        i, j = pos
+        for ii, jj in missing_treasures:
+            dist = abs(i - ii) + abs(j - jj) # distanza di Manhattan dal tesori
+            if dist < min_dist:
+                min_dist = dist
+        return float(min_dist)
+        
+
+            
+if __name__ == "__main__":
+    # 1. Creiamo un labirinto fittizio 5x5 (array piatto da 25 elementi)
+    # Per farti capire visivamente la griglia:
+    # S 1 X 1 T
+    # 2 X 1 X 1
+    # 1 1 1 1 1
+    # X X X 2 X
+    # T 1 1 1 1
+    
+    dummy_predictions = [
+        'S', '1', 'X', '1', 'T',
+        '2', 'X', '1', 'X', '1',
+        '1', '1', '1', '1', '1',
+        'X', '1', 'X', '2', 'X',
+        'T', '1', '1', '1', '1'
+    ]
+
+    print("Inizializzazione del labirinto...")
+    try:
+        # Vogliamo trovare TUTTI i tesori, quindi k=None
+        maze_problem = TreasureMaze(dummy_predictions, k=None)
+        print(f"Labirinto {maze_problem.size}x{maze_problem.size} caricato.")
+        print(f"Tesori da trovare: {maze_problem.k} in posizioni {maze_problem.treasures}")
+        
+        # 2. Eseguiamo l'algoritmo A*
+        print("\nRicerca del percorso ottimale in corso (A*)...")
+        # In AIMA, se non passi l'euristica esplicitamente, astar_search usa in automatico 
+        # il metodo problem.h(node) che hai definito nella classe.
+        goal_node = astar_search(maze_problem)
+        
+        # 3. Estrazione e stampa dei risultati
+        if goal_node:
+            print("\n--- SOLUZIONE TROVATA! ---")
+            print(f"Costo totale del percorso: {goal_node.path_cost}")
+            
+            # Il metodo .path() di AIMA risale l'albero usando i puntatori 'parent'
+            # e restituisce la lista dei nodi dall'inizio alla fine.
+            percorso = goal_node.path()
+            print(f"Numero totale di passi: {len(percorso) - 1}\n")
+            
+            print("Dettaglio mosse:")
+            for step, node in enumerate(percorso):
+                stato = node.state
+                if step == 0:
+                    print(f"[{step}] Partenza da {stato.pos}")
+                else:
+                    azione = node.action # Le coordinate dove ci siamo appena mossi
+                    tesori_presi = len(stato.treasures)
+                    muri_rotti = len(stato.walls)
+                    costo_attuale = node.path_cost
+                    
+                    print(f"[{step}] Vai in {azione} | Costo accumulato: {costo_attuale} | Tesori in tasca: {tesori_presi} | Muri abbattuti: {muri_rotti}")
+        else:
+            print("\nNessuna soluzione trovata! Il labirinto è impossibile.")
+
+    except Exception as e:
+        print(f"Errore durante l'esecuzione: {e}")

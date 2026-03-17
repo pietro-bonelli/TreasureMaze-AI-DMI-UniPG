@@ -5,7 +5,7 @@ from utils import plotImage, show_pipeline, orderPoints, sort_contours
 from classifier import predict
 
 image_path = "assets/test_maze.png"
-image_path = "assets/test_serio1.png"
+image_path = "assets/test2_2.jpg"
 
 
 def getBinaryImage(image):
@@ -50,7 +50,17 @@ def getBinaryImage(image):
     return thresh2b_morph, gray_image
 
 def findBoxes(binaryImage, originalImage, grayImage):
+    # Calcolo le aree
+    img_h, img_w = binaryImage.shape[:2]
+    total_area = img_h * img_w
+
+    # Approssimativamente ogni cella sarà dal 5% al 15% dell'area totale dell'immagine.
+    min_area = total_area * 0.005
+    max_area = total_area * 0.15
+
     contours, hierarchy = cv2.findContours(binaryImage, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # RETR_TREE crea una gerarchia (quadrati dentro altri quadrati sono considerati "figli")
+    # CHAIN_APPROX_SIMPLE per ottimizzazione RAM: non salva in memoria tutti i punti di una linea ma solo i 2 estremi.
     contoursImg = originalImage.copy()
     
     validContours = [] 
@@ -58,14 +68,18 @@ def findBoxes(binaryImage, originalImage, grayImage):
     
     for cnt in contours:
         area = cv2.contourArea(cnt)
-        if(area < 1000 or area > 50000):
+        if(area < min_area or area > max_area):
             continue
         perimeter = cv2.arcLength(cnt, True)
-        epsilon = 0.02 * perimeter 
-        approx = cv2.approxPolyDP(cnt, epsilon, True)
+        epsilon = 0.04 * perimeter # margine di errore tollerato.
+        approx = cv2.approxPolyDP(cnt, epsilon, True) # riduce il numero di vertici di una linea (approssimandola)
         
-        if len(approx) == 4: 
-            validContours.append(approx)
+        if len(approx) == 4 and cv2.isContourConvex(approx):
+            # Controllo l'Aspect Ratio della forma (lati devono essere simili)
+            x,y,w,h = cv2.boundingRect(approx)
+            ratio = float(w) / float(h)
+            if 0.7 <= ratio <= 1.3: # tolleranza del 30%
+                validContours.append(approx)
 
     # Ordinamento delle celle
     if len(validContours) > 0:
@@ -86,10 +100,12 @@ def findBoxes(binaryImage, originalImage, grayImage):
             [0, 28] 
         ], dtype="float32")
 
-        M = cv2.getPerspectiveTransform(rect, dst_pts) 
-        warped = cv2.warpPerspective(grayImage, M, (28, 28))
+        # Sistemo la prospettiva della foto per "appiattirla"
+        M = cv2.getPerspectiveTransform(rect, dst_pts) # calcola una matrice di trasformazione
+        warped = cv2.warpPerspective(grayImage, M, (28, 28), flags=cv2.INTER_AREA) # Utilizza la matrice per appiattire l'immagine e trasformarla in un quadrato quasi "perfetto"
         ret, warped_bin = cv2.threshold(warped, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
         kernel = np.ones((2,2), np.uint8)
+        warped_bin = cv2.dilate(warped_bin, kernel, iterations=1)
         #warped_bin = cv2.GaussianBlur(warped_bin, (1, 1), 0)
         croppedImages.append(warped_bin)
     
