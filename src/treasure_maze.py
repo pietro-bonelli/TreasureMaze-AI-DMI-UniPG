@@ -159,9 +159,9 @@ if __name__ == "__main__":
     dummy_predictions = [
         'S', '1', 'X', '1', 'T',
         '2', 'X', '1', 'X', '1',
-        '1', '1', '1', '1', '1',
+        '1', '1', 'T', '1', '1',
         'X', '1', 'X', '2', 'X',
-        'T', '1', '1', '1', '1'
+        'T', '1', '1', '1', 'T'
     ]
 
     print("Inizializzazione del labirinto...")
@@ -173,9 +173,7 @@ if __name__ == "__main__":
         
         # 2. Eseguiamo l'algoritmo A*
         print("\nRicerca del percorso ottimale in corso (A*)...")
-        # In AIMA, se non passi l'euristica esplicitamente, astar_search usa in automatico 
-        # il metodo problem.h(node) che hai definito nella classe.
-        goal_node = astar_search(maze_problem)
+        goal_node = astar_search(maze_problem, h=maze_problem.h)
         
         # 3. Estrazione e stampa dei risultati
         if goal_node:

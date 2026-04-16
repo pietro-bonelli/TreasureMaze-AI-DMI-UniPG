@@ -5,7 +5,7 @@ from utils import plotImage, show_pipeline, orderPoints, sort_contours
 from classifier import predict
 
 image_path = "assets/test_maze.png"
-image_path = "assets/test2_2.jpg"
+image_path = "assets/test3_2.jpg"
 
 
 def getBinaryImage(image):
@@ -21,9 +21,16 @@ def getBinaryImage(image):
     blur = cv2.medianBlur(gray_image, 5)
     plotImage(blur, "Immagine blurrata")
 
-    thresh2a = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, blockSize=7, C=2) # applico un threshold adattivo con tecnica "MEAN". blockSize = quanti pixel guardare intorno per deciere se un pixel è bianco o nero.
+    # calcolo dinamicamente il block size per l'adaptive threshold
+    h,w = gray_image.shape[:2]
+    dynamic_block = int(min(h, w) * 0.017) # 1.7% della dimensione di un lato
+    if dynamic_block % 2 == 0:
+        dynamic_block += 1 # deve essere per forza dispari
+    dynamic_block = max(3, dynamic_block) # il minimo è 3
+    thresh2a = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, blockSize=dynamic_block, C=2) # applico un threshold adattivo con tecnica "MEAN". blockSize = quanti pixel guardare intorno per deciere se un pixel è bianco o nero.
     plotImage(thresh2a, "Immagine con Threshold adattivo MEAN")
-    thresh2b = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, blockSize=15, C=3) # applico un threshold adattivo con tecnica "GAUS"
+
+    thresh2b = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, blockSize=dynamic_block, C=6) # applico un threshold adattivo con tecnica "GAUS"
     plotImage(thresh2b, "Immagine con Threshold adattivo GAUSSIAN")
 
     # Cerco di "chiudere" i buchi nei perimetri dei box
@@ -47,7 +54,7 @@ def getBinaryImage(image):
         (thresh2b_morph, 'Morph')
     ])'''
 
-    return thresh2b_morph, gray_image
+    return thresh2b_morph, thresh2b
 
 def findBoxes(binaryImage, originalImage, grayImage):
     # Calcolo le aree
@@ -55,7 +62,7 @@ def findBoxes(binaryImage, originalImage, grayImage):
     total_area = img_h * img_w
 
     # Approssimativamente ogni cella sarà dal 5% al 15% dell'area totale dell'immagine.
-    min_area = total_area * 0.005
+    min_area = total_area * 0.003
     max_area = total_area * 0.15
 
     contours, hierarchy = cv2.findContours(binaryImage, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -102,10 +109,11 @@ def findBoxes(binaryImage, originalImage, grayImage):
 
         # Sistemo la prospettiva della foto per "appiattirla"
         M = cv2.getPerspectiveTransform(rect, dst_pts) # calcola una matrice di trasformazione
-        warped = cv2.warpPerspective(grayImage, M, (28, 28), flags=cv2.INTER_AREA) # Utilizza la matrice per appiattire l'immagine e trasformarla in un quadrato quasi "perfetto"
-        ret, warped_bin = cv2.threshold(warped, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+        warped = cv2.warpPerspective(grayImage, M, (28, 28), flags=cv2.INTER_NEAREST) # Utilizza la matrice per appiattire l'immagine e trasformarla in un quadrato quasi "perfetto"
+        #ret, warped_bin = cv2.threshold(warped, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+        #warped_bin = cv2.adaptiveThreshold(warped, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, blockSize=3, C=3)
         kernel = np.ones((2,2), np.uint8)
-        warped_bin = cv2.dilate(warped_bin, kernel, iterations=1)
+        warped_bin = cv2.dilate(warped, kernel, iterations=1)
         #warped_bin = cv2.GaussianBlur(warped_bin, (1, 1), 0)
         croppedImages.append(warped_bin)
     
@@ -117,6 +125,40 @@ def findBoxes(binaryImage, originalImage, grayImage):
         
     show_pipeline(debug_steps)
     return croppedImages
+
+def extract_maze_from_image(image_path):
+    """Estrae l'immagine, identifica le celle ed effettua le predizioni sulle celle stesse.
+    Ritorna matrice 2D del labirinto"""
+    image = cv2.imread(image_path)
+    if image is None:
+        raise FileNotFoundError(f"Immagine non trovata. (Path specificato: {image_path}).")
+    binaryImage, grayImage = getBinaryImage(image)
+    boxes = findBoxes(binaryImage, image, grayImage)
+    grid_size = int(np.sqrt(len(boxes)))
+    if len(boxes) == 0:
+        raise ValueError("Lettura immagine fallita: Nessuna cella trovata.")
+    elif grid_size * grid_size != len(boxes):
+        raise ValueError(f"Lettura immagine fallita: Il numero di celle trovate non forma un quadrato perfetto. (Trovate {len(boxes)} celle.)")
+    
+    labirinto_1D = []
+    for box in boxes:
+        prediction = predict(box)
+        labirinto_1D.append(str(prediction))
+    
+    if labirinto_1D.count('S') != 1:
+        raise ValueError(f"Errore logico: Sono state trovate {labirinto_1D.count('S')} punti di inizio.")
+    treasure_count = labirinto_1D.count('T')
+    if treasure_count < 1:
+        raise ValueError("Errore logico: Sono stati trovati 0 tesori nel labirinto.")
+    
+    # trasformo array in matrice
+    labirinto_2D = []
+    for i in range(0, len(boxes), grid_size):
+        row = labirinto_1D[i : i + grid_size]
+        labirinto_2D.append(row)
+    
+    return labirinto_2D
+
 
 
 image = cv2.imread(image_path) # carico l'immagine dal file
