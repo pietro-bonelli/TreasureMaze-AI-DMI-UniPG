@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
-from utils import plotImage, show_pipeline, orderPoints, sort_contours
-from classifier import predict
+from .utils import plotImage, show_pipeline, orderPoints, sort_contours
+from .classifier import predict
 
 image_path = "assets/test_maze.png"
 image_path = "assets/test2_2.jpg"
@@ -126,7 +126,7 @@ def findBoxes(binaryImage, originalImage, grayImage):
     show_pipeline(debug_steps)
     return croppedImages
 
-def extract_maze_from_image(image_path):
+def extract_treasure_maze_from_image(image_path):
     """Estrae l'immagine, identifica le celle ed effettua le predizioni sulle celle stesse.
     Ritorna matrice 2D del labirinto"""
     image = cv2.imread(image_path)
@@ -159,17 +159,16 @@ def extract_maze_from_image(image_path):
     
     return labirinto_2D
 
+if __name__ == '__main__':
+    image = cv2.imread(image_path) # carico l'immagine dal file
+    binaryImage, grayImage = getBinaryImage(image)
+    boxes = findBoxes(binaryImage, image, grayImage)
 
-
-image = cv2.imread(image_path) # carico l'immagine dal file
-binaryImage, grayImage = getBinaryImage(image)
-boxes = findBoxes(binaryImage, image, grayImage)
-
-labirinto = []
-debug_steps = []
-for box in boxes:
-    prediction = predict(box)
-    labirinto.append(prediction)
-    print(prediction)
-    debug_steps.append((box, f"Previsione: {prediction}"))
-show_pipeline(debug_steps)
+    labirinto = []
+    debug_steps = []
+    for box in boxes:
+        prediction = predict(box)
+        labirinto.append(prediction)
+        print(prediction)
+        debug_steps.append((box, f"Previsione: {prediction}"))
+    show_pipeline(debug_steps)
