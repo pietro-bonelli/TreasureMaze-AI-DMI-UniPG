@@ -2,9 +2,13 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from aima.search import Problem, astar_search
+from aima.search import Problem, astar_search, breadth_first_graph_search
 import math
 from typing import NamedTuple, Tuple
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.colors import ListedColormap
+import time
 
 Position = Tuple[int, int]
 class State(NamedTuple):
@@ -45,8 +49,11 @@ class TreasureMaze(Problem):
         
         if k is None:
             self.k = len(self.treasures) # Se k = None (trova tutti i tesori) -> k diventa numero totale di tesori trovati.
+        else:
+            self.k = k
 
         initial_state = State(pos=start_pos, treasures=(), walls=())
+        self.expanded_nodes = 0
         super().__init__(initial_state)
 
     # Dato uno stato (i, j) ritorna la lista delle possibili azioni.
@@ -55,6 +62,7 @@ class TreasureMaze(Problem):
         Lista delle azioni possibili a partire dallo stato 'state'.
         La lista delle azioni è ritornata sottoforma di array di coordinate che rappresentano lo spostamento.
         """
+        self.expanded_nodes +=1
         (i, j) = state.pos
         #                      SU     GIU    SINISTRA  DESTRA
         possible_actions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
@@ -126,7 +134,7 @@ class TreasureMaze(Problem):
         distances.sort() # Costo O(nlogn)
         return float(distances[m_missing - 1]) # m-esimo tesoro più vicino
 
-    def h_alternative(self, node) -> float:
+    def h_manhattan(self, node) -> float:
         """Distanza di Manhattan dal tesoro (non raccolto) più vicino."""
         state = node.state
         pos = state.pos
@@ -146,6 +154,59 @@ class TreasureMaze(Problem):
         return float(min_dist)
         
 
+def show_path(maze_problem, path_nodes, title):
+    """
+    Mostra una singola finestra matplotlib con la griglia e la linea del percorso.
+    """
+    size = maze_problem.size
+    
+    grid_colors = np.zeros((size, size))
+    
+    for i in range(size):
+        for j in range(size):
+            val = maze_problem.grid[i][j]
+            if val == 'X':
+                grid_colors[i, j] = 1
+            elif val == 'S':
+                grid_colors[i, j] = 2
+            elif val == 'T':
+                grid_colors[i, j] = 3
+
+    cmap = ListedColormap(['white', 'black', 'limegreen', 'gold'])
+    
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.matshow(grid_colors, cmap=cmap)
+
+    # 3. Aggiunta dei valori testuali nelle celle
+    for i in range(size):
+        for j in range(size):
+            val = maze_problem.grid[i][j]
+            # Determiniamo il colore del testo per il contrasto
+            text_color = "white" if val == 'X' else "black"
+            
+            ax.text(j, i, str(val), 
+                    va='center', ha='center', 
+                    fontsize=12, fontweight='bold', 
+                    color=text_color)
+    
+    # Disegno la griglia per separare le celle
+    ax.set_xticks(np.arange(-0.5, size, 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, size, 1), minor=True)
+    ax.grid(which='minor', color='gray', linestyle='-', linewidth=2)
+    
+    # Rimuove gli assi
+    ax.tick_params(which='both', bottom=False, left=False, labelbottom=False, labelleft=False)
+
+    # Coordinate del percorso
+    y_coords = [node.state.pos[0] for node in path_nodes]
+    x_coords = [node.state.pos[1] for node in path_nodes]
+    
+    # Traccia il percorso
+    ax.plot(x_coords, y_coords, color='red', linewidth=3, marker='o', markersize=6)
+    
+    plt.title(title, pad=15, fontsize=14, fontweight='bold')
+    plt.show()
+
             
 if __name__ == "__main__":
     # 1. Creiamo un labirinto fittizio 5x5 (array piatto da 25 elementi)
@@ -157,11 +218,11 @@ if __name__ == "__main__":
     # T 1 1 1 1
     
     dummy_predictions = [
-        'S', '1', 'X', '1', 'T',
-        '2', 'X', '1', 'X', '1',
-        '1', '1', 'T', '1', '1',
-        'X', '1', 'X', '2', 'X',
-        'T', '1', '1', '1', 'T'
+        'S', 'X', 'T', '1', '1',
+        '1', 'X', '1', '1', '1',
+        '1', '1', '1', 'X', '1',
+        'X', '1', 'X', 'X', 'T',
+        'T', '1', '1', '1', '1'
     ]
 
     print("Inizializzazione del labirinto...")
@@ -171,34 +232,44 @@ if __name__ == "__main__":
         print(f"Labirinto {maze_problem.size}x{maze_problem.size} caricato.")
         print(f"Tesori da trovare: {maze_problem.k} in posizioni {maze_problem.treasures}")
         
-        # 2. Eseguiamo l'algoritmo A*
-        print("\nRicerca del percorso ottimale in corso (A*)...")
-        goal_node = astar_search(maze_problem, h=maze_problem.h)
-        
-        # 3. Estrazione e stampa dei risultati
-        if goal_node:
-            print("\n--- SOLUZIONE TROVATA! ---")
-            print(f"Costo totale del percorso: {goal_node.path_cost}")
-            
-            # Il metodo .path() di AIMA risale l'albero usando i puntatori 'parent'
-            # e restituisce la lista dei nodi dall'inizio alla fine.
-            percorso = goal_node.path()
-            print(f"Numero totale di passi: {len(percorso) - 1}\n")
-            
-            print("Dettaglio mosse:")
-            for step, node in enumerate(percorso):
-                stato = node.state
-                if step == 0:
-                    print(f"[{step}] Partenza da {stato.pos}")
-                else:
-                    azione = node.action # Le coordinate dove ci siamo appena mossi
-                    tesori_presi = len(stato.treasures)
-                    muri_rotti = len(stato.walls)
-                    costo_attuale = node.path_cost
-                    
-                    print(f"[{step}] Vai in {azione} | Costo accumulato: {costo_attuale} | Tesori in tasca: {tesori_presi} | Muri abbattuti: {muri_rotti}")
+        results = {}
+
+        # 1. Esecuzione BFS
+        print("Esecuzione BFS...")
+        maze_problem.expanded_nodes = 0
+        t0 = time.time()
+        goal_bfs = breadth_first_graph_search(maze_problem)
+        results['BFS'] = {'goal': goal_bfs, 'time': time.time() - t0, 'nodes':maze_problem.expanded_nodes}
+
+        # 2. Esecuzione A* con Distanza di Manhattan semplice.
+        print("Esecuzione A* con euristicaa Distanza di Manhattan (semplice)...")
+        maze_problem.expanded_nodes = 0
+        t0 = time.time()
+        goal_astar = astar_search(maze_problem, h=maze_problem.h_manhattan)
+        results['A*_semplice'] = {'goal': goal_astar, 'time': time.time() - t0, 'nodes':maze_problem.expanded_nodes}
+
+        # 3. Esecuzione A* con Distanza dal m-esimo nodo più vicino (avanzata).
+        print("Esecuzione A* con euristicaa Distanza di Manhattan dall'm-esimo nodo più vicino (avanzata)...")
+        maze_problem.expanded_nodes = 0
+        t0 = time.time()
+        goal_astar1 = astar_search(maze_problem, h=maze_problem.h)
+        results['A*_avanzata'] = {'goal': goal_astar1, 'time': time.time() - t0, 'nodes':maze_problem.expanded_nodes}
+
+        # --- STAMPA TABELLA STATISTICHE ---
+        print("\n" + "="*55)
+        print(f"{'Algoritmo':<18} | {'Tempo (s)':<10} | {'Nodi Espansi':<12} | {'Costo'}")
+        print("-" * 55)
+        for algo, data in results.items():
+            cost = data['goal'].path_cost if data['goal'] else "Fallito"
+            print(f"{algo:<18} | {data['time']:<10.4f} | {data['nodes']:<12} | {cost}")
+        print("="*55)
+
+        # Mostra a schermo il percorso trovato da A* avanzata
+        best_goal = results['A*_avanzata']['goal']
+        if best_goal:
+            show_path(maze_problem, best_goal.path(), "Percorso A* (Avanzata)")
         else:
-            print("\nNessuna soluzione trovata! Il labirinto è impossibile.")
+            print("Nessuna soluzione trovata! Il labirinto è impossibile")
 
     except Exception as e:
         print(f"Errore durante l'esecuzione: {e}")

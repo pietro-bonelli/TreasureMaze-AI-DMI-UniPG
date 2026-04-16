@@ -5,7 +5,7 @@ from utils import plotImage, show_pipeline, orderPoints, sort_contours
 from classifier import predict
 
 image_path = "assets/test_maze.png"
-image_path = "assets/test3_2.jpg"
+image_path = "assets/test2_2.jpg"
 
 
 def getBinaryImage(image):
