@@ -3,6 +3,7 @@ v2: l'agente si può muovere solo fra stanze adiacenti
 v3: la posizione iniziale dell'agente è rappresentata dalla cella avente la lettera 'S' (start).
 v4: le celle descritte da un numero compreso tra 1 e 4 (inclusi) sono calpestabili al medesimo costo.
 v5: le celle aventi la lettera 'X' rappresentano un muro, che può essere abbattuto a costo 5.
+v6: le celle di tipo 'Muro' (X), una volta abbattuto, diventa automaticamente caplestabile a costo 1.
 v6: i tesori sono rappresentati dalla lettera 'T'
 v7: il labirinto è rappresentato da una matrice di dimensioni N x N. Ogni cella della matrice rappresenta una possibile posizione dell'agente.
 v8: le possibili azioni dell'agente sono: ['spostamento verso l'alto', 'spostamento verso il basso', 'spostamento verso destra', 'spostamento verso sinistra']
@@ -10,3 +11,6 @@ v9: sono possibili 2 versioni del gioco. Nella prima, lo scopo è quello di catt
 v10: la matrice è estrapolata da un'immagine del labirinto stesso.
 v11: lo stato è rappresentato da una tupla composta da  tuple(tuple(POSIZIONE ATTUALE), tuple(TESORI TROVATI), tuple(MURI ABBATTUTI))
 v12: il costo per calpestare un Tesoro o lo Stato Iniziale (in un secondo momento) è 1.
+v13: l'agente non può compiere azioni che lo portino fuori dai confini della matrice N x N.
+v14: lo stato Goal è soddisfatto se len(tuple(tesori_raccolti)) >= K, dove K può essere esplicitato tra 1 e N, o può assumere automaticamente valore N (dove N è il numero di tesori totali presenti sulla mappa)
+
