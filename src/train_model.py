@@ -8,6 +8,8 @@ import tensorflow as tf
 import keras
 from keras import layers
 from keras.callbacks import EarlyStopping
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns # Opzionale, per un grafico più bello
 
 #from TreasureMaze.old.generate_fonts import generate_digital_dataset
 
@@ -133,4 +135,32 @@ early_stopping = EarlyStopping(
 print("Inizio fase di addestramento...")
 model.fit(x_train, y_train, epochs=15, verbose=2, validation_split=0.2, callbacks=[early_stopping])
 print("Fine fase di addestramento.")
+
+# prende l'ultimo 20% dau dati di training, lo stesso che è stato usato da Keras come validation set.
+# (Keras usa automaticamente l'ultimo 20% dei dati che si passano)
+val_size = int(len(x_train) * 0.2)
+x_val = x_train[-val_size:]
+y_val = y_train[-val_size:]
+
+print("\nGenerazione metriche di valutazione...")
+y_pred_probs = model.predict(x_val)
+y_pred = np.argmax(y_pred_probs, axis=1)
+
+# Generazione della Confusion Matrix
+cm = confusion_matrix(y_val, y_pred)
+
+target_names = ['1', '2', '3', '4', 'S', 'T', 'X']
+print("\n--- Classification Report ---")
+print(classification_report(y_val, y_pred, target_names=target_names))
+
+# Visualizzazione grafica della Confusion Matrix
+plt.figure(figsize=(10, 8))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+            xticklabels=target_names, yticklabels=target_names)
+plt.xlabel('Predetti')
+plt.ylabel('Reali')
+plt.title('Confusion Matrix')
+plt.show()
+
+
 model.save('assets/model.keras')
