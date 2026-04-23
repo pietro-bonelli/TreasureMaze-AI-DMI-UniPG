@@ -51,7 +51,9 @@ class TreasureMaze(Problem):
             self.k = len(self.treasures) # Se k = None (trova tutti i tesori) -> k diventa numero totale di tesori trovati.
         else:
             self.k = k
-
+        if len(self.treasures) < self.k:
+            raise ValueError("Sono stati specificati più tesori di quelli presenti nel labirinto.")
+        
         initial_state = State(pos=start_pos, treasures=(), walls=())
         self.expanded_nodes = 0
         super().__init__(initial_state)
@@ -209,13 +211,6 @@ def show_path(maze_problem, path_nodes, title):
 
             
 if __name__ == "__main__":
-    # 1. Creiamo un labirinto fittizio 5x5 (array piatto da 25 elementi)
-    # Per farti capire visivamente la griglia:
-    # S 1 X 1 T
-    # 2 X 1 X 1
-    # 1 1 1 1 1
-    # X X X 2 X
-    # T 1 1 1 1
     
     dummy_predictions = [
         'S', 'X', 'T', '1', '1',

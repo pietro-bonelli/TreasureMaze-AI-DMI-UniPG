@@ -5,21 +5,31 @@ from .utils import plotImage, show_pipeline, orderPoints, sort_contours
 from .classifier import predict
 
 image_path = "assets/test_maze.png"
-image_path = "assets/test2_2.jpg"
+image_path = "assets/test_6.jpg"
 
 
 def getBinaryImage(image):
     plotImage(image, "Immagine originale")
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # converto l'immagine in SCALA DI GRIGI, essenziale per analisi successive
-    plotImage(gray_image, "Scala di grigi")
+    #plotImage(gray_image, "Scala di grigi")
 
     ret, thresh1 = cv2.threshold(gray_image, 127, 255, cv2.THRESH_BINARY_INV) # applico un threshold statico del "50%"
-    plotImage(thresh1, "Immagine con Threshold classico")
+    #plotImage(thresh1, "Immagine con Threshold classico")
     
+    # inspessisco i tratti prima di applicare il blur, per evitare che linee troppo fine vadano perse con il blur + threshold.
+    kernel_thin = np.ones((2,2), np.uint8)
+    gray_image = cv2.erode(gray_image, kernel_thin, iterations=1)
+
     # Per applicare adaptive Threshold, occorre fare "blurring", ossia rimuovere il rumore dall'immagine.
-    #blur = cv2.GaussianBlur(gray_image, (5, 5), 0)
-    blur = cv2.medianBlur(gray_image, 5)
-    plotImage(blur, "Immagine blurrata")
+    # Kernel per il blur = 0.5% dell'immagine. Calcolato dinamicamente per adattarsi alle diverse risoluzioni di immagini.
+    h, w = gray_image.shape[:2]
+    blur_ksize = int(min(h, w) * 0.006) 
+    if blur_ksize % 2 == 0:
+        blur_ksize += 1 # Il kernel di medianBlur DEVE essere dispari
+    blur_ksize = max(3, blur_ksize) # Almeno 3x3
+    
+    blur = cv2.medianBlur(gray_image, blur_ksize)
+    #plotImage(blur, "Immagine blurrata")
 
     # calcolo dinamicamente il block size per l'adaptive threshold
     h,w = gray_image.shape[:2]
@@ -28,10 +38,10 @@ def getBinaryImage(image):
         dynamic_block += 1 # deve essere per forza dispari
     dynamic_block = max(3, dynamic_block) # il minimo è 3
     thresh2a = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, blockSize=dynamic_block, C=2) # applico un threshold adattivo con tecnica "MEAN". blockSize = quanti pixel guardare intorno per deciere se un pixel è bianco o nero.
-    plotImage(thresh2a, "Immagine con Threshold adattivo MEAN")
+    #plotImage(thresh2a, "Immagine con Threshold adattivo MEAN")
 
     thresh2b = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, blockSize=dynamic_block, C=6) # applico un threshold adattivo con tecnica "GAUS"
-    plotImage(thresh2b, "Immagine con Threshold adattivo GAUSSIAN")
+    #plotImage(thresh2b, "Immagine con Threshold adattivo GAUSSIAN")
 
     # Cerco di "chiudere" i buchi nei perimetri dei box
     kernel_small = np.ones((3,3), np.uint8)
@@ -61,8 +71,8 @@ def findBoxes(binaryImage, originalImage, grayImage):
     img_h, img_w = binaryImage.shape[:2]
     total_area = img_h * img_w
 
-    # Approssimativamente ogni cella sarà dal 5% al 15% dell'area totale dell'immagine.
-    min_area = total_area * 0.003
+    # Approssimativamente ogni cella sarà dal 3% al 15% dell'area totale dell'immagine.
+    min_area = total_area * 0.002
     max_area = total_area * 0.15
 
     contours, hierarchy = cv2.findContours(binaryImage, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -85,7 +95,7 @@ def findBoxes(binaryImage, originalImage, grayImage):
             # Controllo l'Aspect Ratio della forma (lati devono essere simili)
             x,y,w,h = cv2.boundingRect(approx)
             ratio = float(w) / float(h)
-            if 0.7 <= ratio <= 1.3: # tolleranza del 30%
+            if 0.7 <= ratio <= 1.8: # tolleranza del 30%
                 validContours.append(approx)
 
     # Ordinamento delle celle
@@ -114,7 +124,15 @@ def findBoxes(binaryImage, originalImage, grayImage):
         #warped_bin = cv2.adaptiveThreshold(warped, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, blockSize=3, C=3)
         kernel = np.ones((2,2), np.uint8)
         warped_bin = cv2.dilate(warped, kernel, iterations=1)
-        #warped_bin = cv2.GaussianBlur(warped_bin, (1, 1), 0)
+
+        # Pulisco i bordi per evitare che "pezzi" dei bordi precedentemente approssimati possano inficiare sulle predizioni.
+        margin = 3 # 3 pixel per lato
+        
+        warped_bin[:margin, :] = 0    # Pialla il bordo superiore
+        warped_bin[-margin:, :] = 0   # Pialla il bordo inferiore
+        warped_bin[:, :margin] = 0    # Pialla il bordo sinistro
+        warped_bin[:, -margin:] = 0   # Pialla il bordo destro
+
         croppedImages.append(warped_bin)
     
     # Visualizzazione
@@ -144,6 +162,14 @@ def extract_treasure_maze_from_image(image_path):
     for box in boxes:
         prediction = predict(box)
         labirinto_1D.append(str(prediction))
+
+    labirinto = []
+    debug_steps = []
+    for box in boxes:
+        prediction = predict(box)
+        labirinto.append(prediction)
+        debug_steps.append((box, f"Previsione: {prediction}"))
+    show_pipeline(debug_steps)
     
     if labirinto_1D.count('S') != 1:
         raise ValueError(f"Errore logico: Sono state trovate {labirinto_1D.count('S')} punti di inizio.")

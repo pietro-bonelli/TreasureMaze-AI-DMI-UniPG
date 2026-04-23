@@ -32,25 +32,6 @@ def run_pipeline():
         print(f"\n[2/3] Avvio dei solutori per il confronto...")
         risultati = {}
 
-        # --- BFS (Non Informata) ---
-        maze_problem.expanded_nodes = 0
-        t0 = time.time()
-        goal_bfs = breadth_first_graph_search(maze_problem)
-        risultati['BFS'] = {
-            'goal': goal_bfs, 
-            'time': time.time() - t0, 
-            'nodes': maze_problem.expanded_nodes
-        }
-
-        # --- A* (Euristica: Distnza di Manhattan (semplice)) ---
-        maze_problem.expanded_nodes = 0
-        t0 = time.time()
-        goal_astar = astar_search(maze_problem, h=maze_problem.h_manhattan)
-        risultati['A*_semplice'] = {
-            'goal': goal_astar, 
-            'time': time.time() - t0, 
-            'nodes': maze_problem.expanded_nodes
-        }
 
         # --- A* (Euristicha: Distanza dall'm-esimo tesoro non raccolto più vicino (avanzata)) ---
         maze_problem.expanded_nodes = 0
